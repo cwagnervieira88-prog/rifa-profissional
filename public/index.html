@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RifaPro - Sistema Profissional de Rifas</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        .header p { font-size: 1.1rem; opacity: 0.9; }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        .card h2 { margin-bottom: 20px; color: #333; }
+        .form-group { margin-bottom: 15px; }
+        label { font-weight: 600; display: block; margin-bottom: 5px; color: #333; }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        input:focus, textarea:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        button:hover { transform: translateY(-2px); background: #5a67d8; }
+        .btn-success { background: #48bb78; }
+        .btn-success:hover { background: #38a169; }
+        .btn-danger { background: #f56565; }
+        .btn-danger:hover { background: #e53e3e; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .rifa-card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .rifa-card:hover { transform: translateY(-5px); }
+        .rifa-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+        .rifa-info { padding: 15px; }
+        .rifa-info h3 { margin-bottom: 10px; color: #333; }
+        .rifa-info p { color: #666; margin-bottom: 8px; }
+        .rifa-info .preco { font-size: 1.3rem; color: #48bb78; font-weight: bold; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 550px;
+            width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+        .modal-content h2 { margin-bottom: 10px; }
+        .numero-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .numero-item {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-align: center;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+        .qrcode { text-align: center; margin: 20px 0; }
+        .qrcode img { max-width: 200px; border: 1px solid #ddd; padding: 10px; border-radius: 10px; }
+        .pix-copia {
+            background: #f7f7f7;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+        .msg-sucesso {
+            background: #c6f6d5;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            color: #22543d;
+        }
+        .close-modal {
+            float: right;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+        }
+        .close-modal:hover { color: #333; }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎟️ RifaPro Profissional</h1>
+            <p>Sistema completo de rifas com PIX e banco de dados</p>
+        </div>
+
+        <!-- Painel Admin -->
+        <div class="card">
+            <h2>📱 Criar Nova Rifa</h2>
+            <div class="form-group">
+                <label>🏷️ Nome da Rifa</label>
+                <input type="text" id="nomeRifa" placeholder="Ex: Rifa iPhone 15">
+            </div>
+            <div class="form-group">
+                <label>📷 URL da Foto</label>
+                <input type="text" id="fotoRifa" placeholder="https://exemplo.com/foto.jpg">
+            </div>
+            <div class="form-group">
+                <label>🔢 Quantidade de Números (máx 500)</label>
+                <input type="number" id="qtdNumeros" min="1" max="500" value="100">
+            </div>
+            <div class="form-group">
+                <label>💰 Valor por Bilhete (R$)</label>
+                <input type="number" id="valorBilhete" step="0.01" value="10.00">
+            </div>
+            <div class="form-group">
+                <label>📝 Descrição</label>
+                <textarea id="descricao" rows="3" placeholder="Prêmio, data do sorteio..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>💳 Chave PIX</label>
+                <input type="text" id="chavePix" placeholder="Email, CPF ou telefone">
+            </div>
+            <button onclick="criarRifa()">✅ Criar Rifa</button>
+            <button onclick="limparForm()" class="btn-danger">🗑️ Limpar</button>
+        </div>
+
+        <!-- Lista de Rifas -->
+        <div class="card">
+            <h2>🎯 Rifas Disponíveis</h2>
+            <div id="rifasList" class="grid">
+                <p style="text-align: center; grid-column: 1/-1;">Carregando rifas...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Compra -->
+    <div id="modalCompra" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="fecharModal()">&times;</span>
+            <h2 id="modalTitulo"></h2>
+            <p id="modalDescricao" style="color: #666; margin-bottom: 15px;"></p>
+            <div class="form-group">
+                <label>🎫 Quantos números deseja?</label>
+                <input type="number" id="qtdCompra" min="1" value="1">
+                <button onclick="gerarNumerosAleatorios()" style="margin-top: 10px; width: 100%;">🎲 Gerar Números Aleatórios</button>
+            </div>
+            <div id="numerosContainer" class="numero-grid"></div>
+            <div class="form-group">
+                <label>👤 Nome completo</label>
+                <input type="text" id="clienteNome" placeholder="Digite seu nome completo">
+            </div>
+            <div class="form-group">
+                <label>📱 Telefone (WhatsApp)</label>
+                <input type="tel" id="clienteTelefone" placeholder="(11) 99999-9999">
+            </div>
+            <div id="pixInfo" style="display: none;">
+                <hr style="margin: 15px 0;">
+                <h3>💸 Pagamento via PIX</h3>
+                <div class="qrcode" id="qrCodeArea"></div>
+                <p><strong>Código PIX Copia e Cola:</strong></p>
+                <div class="pix-copia">
+                    <span id="pixCopiaCola"></span>
+                </div>
+                <button onclick="copiarPix()" class="btn-success">📋 Copiar Código PIX</button>
+            </div>
+            <button onclick="finalizarCompra()" class="btn-success" style="width: 100%; margin-top: 15px;">💳 Gerar PIX e Reservar Números</button>
+            <div id="msgCompra" style="margin-top: 15px;"></div>
+        </div>
+    </div>
+
+    <script>
+        let rifaAtual = null;
+        let numerosGerados = [];
+        let pagamentoIdAtual = null;
+
+        // Carregar rifas do servidor
+        async function carregarRifas() {
+            try {
+                const response = await fetch('/api/rifas');
+                const rifas = await response.json();
+                const container = document.getElementById('rifasList');
+                
+                if (rifas.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; grid-column: 1/-1;">Nenhuma rifa criada ainda. Crie sua primeira rifa acima!</p>';
+                    return;
+                }
+                
+                container.innerHTML = rifas.map(rifa => `
+                    <div class="rifa-card" onclick="abrirCompra(${rifa.id})">
+                        <img src="${rifa.foto || 'https://via.placeholder.com/300x200?text=Rifa'}" alt="${rifa.nome}" onerror="this.src='https://via.placeholder.com/300x200?text=Sem+Foto'">
+                        <div class="rifa-info">
+                            <h3>${rifa.nome}</h3>
+                            <p>${rifa.descricao || 'Sem descrição'}</p>
+                            <p class="preco">R$ ${rifa.valor_bilhete.toFixed(2)} / bilhete</p>
+                            <p>🎫 Vendidos: ${rifa.numeros_vendidos || 0} / ${rifa.quantidade_numeros}</p>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Erro ao carregar rifas:', error);
+                document.getElementById('rifasList').innerHTML = '<p style="text-align: center; grid-column: 1/-1; color: red;">Erro ao carregar rifas. Verifique se o servidor está rodando.</p>';
+            }
+        }
+
+        // Criar nova rifa
+        async function criarRifa() {
+            const dados = {
+                nome: document.getElementById('nomeRifa').value,
+                foto: document.getElementById('fotoRifa').value,
+                quantidade_numeros: parseInt(document.getElementById('qtdNumeros').value),
+                valor_bilhete: parseFloat(document.getElementById('valorBilhete').value),
+                descricao: document.getElementById('descricao').value,
+                chave_pix: document.getElementById('chavePix').value
+            };
+            
+            if (!dados.nome) {
+                alert('Preencha o nome da rifa');
+                return;
+            }
+            if (dados.valor_bilhete <= 0) {
+                alert('Valor do bilhete deve ser maior que zero');
+                return;
+            }
+            if (!dados.chave_pix) {
+                alert('Preencha a chave PIX');
+                return;
+            }
+            
+            const response = await fetch('/api/rifas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dados)
+            });
+            
+            if (response.ok) {
+                alert('✅ Rifa criada com sucesso!');
+                limparForm();
+                carregarRifas();
+            } else {
+                const erro = await response.json();
+                alert('❌ Erro ao criar rifa: ' + erro.error);
+            }
+        }
+
+        function limparForm() {
+            document.getElementById('nomeRifa').value = '';
+            document.getElementById('fotoRifa').value = '';
+            document.getElementById('qtdNumeros').value = '100';
+            document.getElementById('valorBilhete').value = '10.00';
+            document.getElementById('descricao').value = '';
+            document.getElementById('chavePix').value = '';
+        }
+
+        // Abrir modal de compra
+        async function abrirCompra(rifaId) {
+            const response = await fetch(`/api/rifas/${rifaId}`);
+            rifaAtual = await response.json();
+            
+            document.getElementById('modalTitulo').innerHTML = rifaAtual.nome;
+            document.getElementById('modalDescricao').innerHTML = rifaAtual.descricao || '';
+            document.getElementById('modalCompra').style.display = 'flex';
+            document.getElementById('pixInfo').style.display = 'none';
+            document.getElementById('numerosContainer').innerHTML = '';
+            document.getElementById('msgCompra').innerHTML = '';
+            document.getElementById('qtdCompra').value = '1';
+            document.getElementById('clienteNome').value = '';
+            document.getElementById('clienteTelefone').value = '';
+            numerosGerados = [];
+        }
+
+        function fecharModal() {
+            document.getElementById('modalCompra').style.display = 'none';
+        }
+
+        // Gerar números aleatórios
+        async function gerarNumerosAleatorios() {
+            const qtd = parseInt(document.getElementById('qtdCompra').value);
+            if (qtd < 1) {
+                alert('Quantidade inválida');
+                return;
+            }
+            
+            const response = await fetch('/api/gerar-numeros', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rifa_id: rifaAtual.id, quantidade: qtd })
+            });
+            
+            const data = await response.json();
+            if (data.error) {
+                alert('❌ ' + data.error);
+            } else {
+                numerosGerados = data.numeros;
+                const container = document.getElementById('numerosContainer');
+                container.innerHTML = numerosGerados.map(n => `<div class="numero-item">${n}</div>`).join('');
+            }
+        }
+
+        // Finalizar compra e gerar PIX
+        async function finalizarCompra() {
+            const nome = document.getElementById('clienteNome').value.trim();
+            const telefone = document.getElementById('clienteTelefone').value.trim();
+            
+            if (!nome) {
+                alert('Preencha seu nome');
+                return;
+            }
+            if (!telefone) {
+                alert('Preencha seu telefone');
+                return;
+            }
+            if (numerosGerados.length === 0) {
+                alert('Gere os números primeiro');
+                return;
+            }
+            
+            const valorTotal = numerosGerados.length * rifaAtual.valor_bilhete;
+            
+            const response = await fetch('/api/pagamento/pix', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    rifa_id: rifaAtual.id,
+                    numeros: numerosGerados,
+                    nome_cliente: nome,
+                    telefone: telefone,
+                    valor_total: valorTotal
+                })
+            });
+            
+            const pagamento = await response.json();
+            pagamentoIdAtual = pagamento.pagamento_id;
+            
+            document.getElementById('pixInfo').style.display = 'block';
+            document.getElementById('qrCodeArea').innerHTML = `<img src="${pagamento.qr_code}" alt="QR Code PIX">`;
+            document.getElementById('pixCopiaCola').innerHTML = pagamento.pix_copia_cola;
+            document.getElementById('msgCompra').innerHTML = `
+                <div class="msg-sucesso">
+                    ✅ <strong>Números reservados com sucesso!</strong><br>
+                    🎫 Números: ${numerosGerados.join(', ')}<br>
+                    💰 Valor total: R$ ${valorTotal.toFixed(2)}<br>
+                    📱 Efetue o pagamento via PIX acima para confirmar
+                </div>
+            `;
+            
+            // Simular confirmação após pagamento (em produção seria webhook)
+            setTimeout(async () => {
+                await fetch('/api/confirmar-pagamento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pagamento_id: pagamentoIdAtual, nome_cliente: nome, telefone: telefone })
+                });
+                carregarRifas();
+            }, 5000);
+        }
+
+        function copiarPix() {
+            const texto = document.getElementById('pixCopiaCola').innerText;
+            navigator.clipboard.writeText(texto);
+            alert('✅ Código PIX copiado!');
+        }
+
+        // Fechar modal ao clicar fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('modalCompra');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Carregar rifas ao iniciar
+        carregarRifas();
+    </script>
+</body>
+</html>
