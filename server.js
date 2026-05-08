@@ -1,207 +1,117 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const { open } = require('sqlite');
-const sqlite3 = require('sqlite3');
-const { v4: uuidv4 } = require('uuid');
-const QRCode = require('qrcode');
-require('dotenv').config();
+// MERCADO PAGO - CRIAR PREFERÊNCIA DE PAGAMENTO
+const { MercadoPagoConfig, Preference } = require('mercadopago');
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-
-let db;
-
-async function initDatabase() {
-  db = await open({
-    filename: './rifas.db',
-    driver: sqlite3.Database
-  });
-
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS rifas (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome TEXT NOT NULL,
-      foto TEXT,
-      quantidade_numeros INTEGER NOT NULL,
-      valor_bilhete REAL NOT NULL,
-      descricao TEXT,
-      chave_pix TEXT NOT NULL,
-      status TEXT DEFAULT 'ativa',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS numeros_vendidos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      rifa_id INTEGER NOT NULL,
-      numero INTEGER NOT NULL,
-      nome_cliente TEXT NOT NULL,
-      telefone TEXT NOT NULL,
-      pagamento_id TEXT,
-      status TEXT DEFAULT 'pago',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(rifa_id) REFERENCES rifas(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS pagamentos (
-      id TEXT PRIMARY KEY,
-      rifa_id INTEGER NOT NULL,
-      numeros TEXT NOT NULL,
-      valor_total REAL NOT NULL,
-      status TEXT DEFAULT 'pendente',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+app.post('/api/criar-preferencia', async (req, res) => {
+  const { rifa_id, numeros, nome_cliente, email_cliente, telefone, valor_total } = req.body;
   
-  console.log('✅ Banco de dados inicializado');
-  
-  const rifas = await db.all('SELECT * FROM rifas');
-  if (rifas.length === 0) {
-    await db.run(`
-      INSERT INTO rifas (nome, foto, quantidade_numeros, valor_bilhete, descricao, chave_pix)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, 'Rifa iPhone 15', 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=400', 100, 15.00, 'Sorteio dia 30/12! Prêmio incrível!', 'exemplo@email.com');
-    console.log('📱 Rifa exemplo criada');
-  }
-}
-
-app.post('/api/rifas', async (req, res) => {
-  const { nome, foto, quantidade_numeros, valor_bilhete, descricao, chave_pix } = req.body;
   try {
-    const result = await db.run(
-      'INSERT INTO rifas (nome, foto, quantidade_numeros, valor_bilhete, descricao, chave_pix) VALUES (?, ?, ?, ?, ?, ?)',
-      nome, foto, quantidade_numeros, valor_bilhete, descricao, chave_pix
-    );
-    res.json({ id: result.lastID, success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/rifas', async (req, res) => {
-  try {
-    const rifas = await db.all('SELECT * FROM rifas ORDER BY created_at DESC');
-    for (let rifa of rifas) {
-      const vendidos = await db.get('SELECT COUNT(*) as total FROM numeros_vendidos WHERE rifa_id = ?', rifa.id);
-      rifa.numeros_vendidos = vendidos ? vendidos.total : 0;
-    }
-    res.json(rifas);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/rifas/:id', async (req, res) => {
-  try {
-    const rifa = await db.get('SELECT * FROM rifas WHERE id = ?', req.params.id);
-    if (!rifa) return res.status(404).json({ error: 'Rifa não encontrada' });
+    const client = new MercadoPagoConfig({
+      accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
+    });
     
-    const numerosOcupados = await db.all('SELECT numero FROM numeros_vendidos WHERE rifa_id = ?', rifa.id);
-    rifa.numeros_disponiveis = [];
-    for (let i = 1; i <= rifa.quantidade_numeros; i++) {
-      if (!numerosOcupados.some(n => n.numero === i)) {
-        rifa.numeros_disponiveis.push(i);
+    const preference = new Preference(client);
+    
+    const numerosStr = numeros.join(', ');
+    
+    const response = await preference.create({
+      body: {
+        items: [
+          {
+            id: String(rifa_id),
+            title: `Rifa - ${numerosStr}`,
+            description: `Números: ${numerosStr}`,
+            quantity: 1,
+            currency_id: 'BRL',
+            unit_price: valor_total,
+          }
+        ],
+        payer: {
+          name: nome_cliente,
+          email: email_cliente,
+          phone: {
+            number: telefone.replace(/\D/g, '')
+          }
+        },
+        back_urls: {
+          success: `${process.env.SITE_URL}/?payment=success`,
+          failure: `${process.env.SITE_URL}/?payment=failure`,
+          pending: `${process.env.SITE_URL}/?payment=pending`
+        },
+        auto_return: 'approved',
+        notification_url: `${process.env.SITE_URL}/api/webhook/mercadopago`,
+        external_reference: `${rifa_id}_${numeros.join('_')}_${Date.now()}`
       }
-    }
-    res.json(rifa);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/pagamento/pix', async (req, res) => {
-  const { rifa_id, numeros, nome_cliente, telefone, valor_total } = req.body;
-  
-  try {
-    const pagamentoId = uuidv4();
-    const numerosStr = numeros.join(',');
+    });
     
+    // Salvar reserva temporária no banco
+    const pagamentoId = require('crypto').randomUUID();
     await db.run(
-      'INSERT INTO pagamentos (id, rifa_id, numeros, valor_total, status) VALUES (?, ?, ?, ?, ?)',
-      pagamentoId, rifa_id, numerosStr, valor_total, 'pendente'
+      'INSERT INTO pagamentos (id, rifa_id, numeros, valor_total, status, preferencia_id) VALUES (?, ?, ?, ?, ?, ?)',
+      pagamentoId, rifa_id, numeros.join(','), valor_total, 'aguardando_pagamento', response.id
     );
-    
-    const qrCodeBase64 = await QRCode.toDataURL(`pix:teste?valor=${valor_total}&id=${pagamentoId}`);
     
     res.json({
-      pagamento_id: pagamentoId,
-      qr_code: qrCodeBase64,
-      pix_copia_cola: `00020126580014BR.GOV.BCB.PIX0136${pagamentoId}@rifa.com5204000053039865404${valor_total.toFixed(2)}5802BR5925Rifa Sistema6009SAO PAULO62070503***6304E3A9`,
-      valor_total: valor_total,
-      numeros: numeros
+      init_point: response.init_point,
+      preference_id: response.id
     });
     
   } catch (error) {
+    console.error('Erro ao criar preferência:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/confirmar-pagamento', async (req, res) => {
-  const { pagamento_id, nome_cliente, telefone } = req.body;
-  
+// WEBHOOK - CONFIRMAR PAGAMENTO
+app.post('/api/webhook/mercadopago', async (req, res) => {
   try {
-    const pagamento = await db.get('SELECT * FROM pagamentos WHERE id = ?', pagamento_id);
-    if (!pagamento) return res.status(404).json({ error: 'Pagamento não encontrado' });
+    const { type, data } = req.body;
     
-    const numeros = pagamento.numeros.split(',').map(Number);
-    
-    for (let numero of numeros) {
-      await db.run(
-        'INSERT INTO numeros_vendidos (rifa_id, numero, nome_cliente, telefone, pagamento_id) VALUES (?, ?, ?, ?, ?)',
-        pagamento.rifa_id, numero, nome_cliente, telefone, pagamento_id
-      );
+    if (type === 'payment') {
+      const paymentId = data.id;
+      
+      const client = new MercadoPagoConfig({
+        accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
+      });
+      
+      const payment = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        headers: {
+          'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`
+        }
+      }).then(res => res.json());
+      
+      if (payment.status === 'approved') {
+        const externalRef = payment.external_reference;
+        const [rifa_id, ...numerosArray] = externalRef.split('_');
+        const numeros = numerosArray.map(Number);
+        
+        // Verificar se números ainda estão disponíveis
+        for (let numero of numeros) {
+          const existente = await db.get(
+            'SELECT * FROM numeros_vendidos WHERE rifa_id = ? AND numero = ? AND status = "pago"',
+            rifa_id, numero
+          );
+          
+          if (!existente) {
+            await db.run(
+              'INSERT INTO numeros_vendidos (rifa_id, numero, nome_cliente, telefone, pagamento_id, status) VALUES (?, ?, ?, ?, ?, ?)',
+              rifa_id, numero, payment.payer.first_name || payment.payer.email, payment.payer.phone?.number || '', payment.id, 'pago'
+            );
+          }
+        }
+        
+        // Atualizar status do pagamento
+        await db.run(
+          'UPDATE pagamentos SET status = "pago" WHERE preferencia_id = ?',
+          payment.preference_id
+        );
+        
+        console.log(`✅ Pagamento ${paymentId} confirmado!`);
+      }
     }
     
-    await db.run('UPDATE pagamentos SET status = "pago" WHERE id = ?', pagamento_id);
-    
-    res.json({ success: true, message: 'Números reservados com sucesso!' });
-    
+    res.sendStatus(200);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Erro no webhook:', error);
+    res.sendStatus(200);
   }
-});
-
-app.post('/api/gerar-numeros', async (req, res) => {
-  const { rifa_id, quantidade } = req.body;
-  
-  try {
-    const rifa = await db.get('SELECT * FROM rifas WHERE id = ?', rifa_id);
-    if (!rifa) return res.status(404).json({ error: 'Rifa não encontrada' });
-    
-    const numerosOcupados = await db.all('SELECT numero FROM numeros_vendidos WHERE rifa_id = ?', rifa_id);
-    const ocupadosSet = new Set(numerosOcupados.map(n => n.numero));
-    const disponiveis = [];
-    
-    for (let i = 1; i <= rifa.quantidade_numeros; i++) {
-      if (!ocupadosSet.has(i)) disponiveis.push(i);
-    }
-    
-    if (disponiveis.length < quantidade) {
-      return res.status(400).json({ error: 'Números insuficientes disponíveis' });
-    }
-    
-    for (let i = disponiveis.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [disponiveis[i], disponiveis[j]] = [disponiveis[j], disponiveis[i]];
-    }
-    
-    const selecionados = disponiveis.slice(0, quantidade).sort((a, b) => a - b);
-    res.json({ numeros: selecionados });
-    
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-const PORT = process.env.PORT || 3000;
-initDatabase().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  });
 });
