@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comprar Rifas - RifaPro</title>
+    <title>RifaPro - Compre sua Rifa</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -77,7 +77,6 @@
             border-radius: 10px;
             font-weight: bold;
         }
-        .qrcode { text-align: center; margin: 20px 0; }
         button {
             background: #667eea;
             color: white;
@@ -91,6 +90,7 @@
             margin-top: 10px;
         }
         .btn-success { background: #48bb78; }
+        .btn-mp { background: #009ee3; }
         .close-modal {
             float: right;
             font-size: 28px;
@@ -99,6 +99,16 @@
         .form-group { margin-bottom: 15px; }
         .form-group label { font-weight: 600; display: block; margin-bottom: 5px; }
         .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -124,25 +134,22 @@
         <div class="form-group">
             <label>🎫 Quantos números deseja?</label>
             <input type="number" id="qtdCompra" min="1" value="1">
-            <button onclick="gerarNumerosAleatorios()">🎲 Gerar Números Aleatórios</button>
+            <button onclick="gerarNumerosAleatorios()">🎲 Gerar Números</button>
         </div>
         <div id="numerosContainer" class="numero-grid"></div>
         <div class="form-group">
-            <label>👤 Seu nome completo</label>
+            <label>👤 Nome completo</label>
             <input type="text" id="clienteNome" placeholder="Digite seu nome">
         </div>
         <div class="form-group">
-            <label>📱 Seu telefone (WhatsApp)</label>
+            <label>📧 E-mail</label>
+            <input type="email" id="clienteEmail" placeholder="Digite seu e-mail">
+        </div>
+        <div class="form-group">
+            <label>📱 Telefone (WhatsApp)</label>
             <input type="tel" id="clienteTelefone" placeholder="(11) 99999-9999">
         </div>
-        <div id="pixInfo" style="display: none;">
-            <hr style="margin: 15px 0;">
-            <h3>💸 Pagar via PIX</h3>
-            <div class="qrcode" id="qrCodeArea"></div>
-            <textarea id="pixCopiaCola" rows="2" readonly style="width:100%; font-size:12px; padding:8px;"></textarea>
-            <button onclick="copiarPix()">📋 Copiar Código PIX</button>
-        </div>
-        <button onclick="finalizarCompra()" class="btn-success">💳 Confirmar e Gerar PIX</button>
+        <button id="btnPagar" class="btn-mp" style="display: none;" onclick="pagarComMercadoPago()">💳 Pagar com Mercado Pago</button>
         <div id="msgCompra" style="margin-top: 15px;"></div>
     </div>
 </div>
@@ -150,6 +157,7 @@
 <script>
     let rifaAtual = null;
     let numerosGerados = [];
+    let preferenciaId = null;
 
     function carregarRifas() {
         fetch('/api/rifas')
@@ -162,7 +170,7 @@
                 }
                 container.innerHTML = rifas.map(rifa => `
                     <div class="rifa-card" onclick="abrirCompra(${rifa.id})">
-                        <img src="${rifa.foto || 'https://via.placeholder.com/300x200?text=Rifa'}" alt="${rifa.nome}" onerror="this.src='https://via.placeholder.com/300x200?text=Sem+Foto'">
+                        <img src="${rifa.foto || 'https://via.placeholder.com/300x200?text=Rifa'}" alt="${rifa.nome}">
                         <div class="rifa-info">
                             <h3>${rifa.nome}</h3>
                             <p>${rifa.descricao || ''}</p>
@@ -182,13 +190,15 @@
                 document.getElementById('modalTitulo').innerHTML = rifa.nome;
                 document.getElementById('modalDescricao').innerHTML = rifa.descricao || '';
                 document.getElementById('modalCompra').style.display = 'flex';
-                document.getElementById('pixInfo').style.display = 'none';
                 document.getElementById('numerosContainer').innerHTML = '';
                 document.getElementById('msgCompra').innerHTML = '';
+                document.getElementById('btnPagar').style.display = 'none';
                 document.getElementById('clienteNome').value = '';
+                document.getElementById('clienteEmail').value = '';
                 document.getElementById('clienteTelefone').value = '';
                 document.getElementById('qtdCompra').value = '1';
                 numerosGerados = [];
+                preferenciaId = null;
             });
     }
 
@@ -212,16 +222,22 @@
                 numerosGerados = data.numeros;
                 const container = document.getElementById('numerosContainer');
                 container.innerHTML = numerosGerados.map(n => `<div class="numero-item">${n}</div>`).join('');
+                document.getElementById('btnPagar').style.display = 'block';
             }
         });
     }
 
-    function finalizarCompra() {
+    function pagarComMercadoPago() {
         const nome = document.getElementById('clienteNome').value.trim();
+        const email = document.getElementById('clienteEmail').value.trim();
         const telefone = document.getElementById('clienteTelefone').value.trim();
         
         if (!nome) {
             alert('Preencha seu nome');
+            return;
+        }
+        if (!email) {
+            alert('Preencha seu e-mail');
             return;
         }
         if (!telefone) {
@@ -235,42 +251,40 @@
         
         const valorTotal = numerosGerados.length * rifaAtual.valor_bilhete;
         
-        fetch('/api/pagamento/pix', {
+        // Botão desabilitado com loading
+        const btn = document.getElementById('btnPagar');
+        const originalText = btn.innerText;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading"></span> Processando...';
+        
+        fetch('/api/criar-preferencia', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 rifa_id: rifaAtual.id,
                 numeros: numerosGerados,
                 nome_cliente: nome,
+                email_cliente: email,
                 telefone: telefone,
                 valor_total: valorTotal
             })
         })
         .then(res => res.json())
-        .then(pagamento => {
-            document.getElementById('pixInfo').style.display = 'block';
-            document.getElementById('qrCodeArea').innerHTML = `<img src="${pagamento.qr_code}" style="width:180px; border:1px solid #ddd; padding:10px; border-radius:10px;">`;
-            document.getElementById('pixCopiaCola').value = pagamento.pix_copia_cola;
-            document.getElementById('msgCompra').innerHTML = `
-                <div style="background:#e6ffe6; padding:15px; border-radius:10px; margin-top:10px;">
-                    ✅ <strong>Números reservados!</strong><br>
-                    🎫 Números: ${numerosGerados.join(', ')}<br>
-                    💰 Valor: R$ ${valorTotal.toFixed(2)}<br>
-                    📱 Efetue o pagamento via PIX acima para confirmar
-                </div>
-            `;
-            
-            // Atualizar lista após confirmação
-            setTimeout(() => {
-                carregarRifas();
-            }, 3000);
+        .then(data => {
+            if (data.error) {
+                alert('Erro: ' + data.error);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            } else {
+                // Redirecionar para o checkout do Mercado Pago
+                window.location.href = data.init_point;
+            }
+        })
+        .catch(err => {
+            alert('Erro ao processar pagamento');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         });
-    }
-
-    function copiarPix() {
-        const texto = document.getElementById('pixCopiaCola').value;
-        navigator.clipboard.writeText(texto);
-        alert('✅ Código PIX copiado!');
     }
 
     function fecharModal() {
