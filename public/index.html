@@ -90,7 +90,7 @@
             margin-top: 10px;
         }
         .btn-success { background: #48bb78; }
-        .btn-mp { background: #009ee3; }
+        .btn-pix { background: #32BCAD; }
         .close-modal {
             float: right;
             font-size: 28px;
@@ -99,16 +99,24 @@
         .form-group { margin-bottom: 15px; }
         .form-group label { font-weight: 600; display: block; margin-bottom: 5px; }
         .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #fff;
-            border-radius: 50%;
-            border-top-color: transparent;
-            animation: spin 1s linear infinite;
+        .pix-area {
+            text-align: center;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 15px 0;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .pix-area img { max-width: 200px; margin: 10px auto; }
+        .pix-codigo {
+            background: #e9ecef;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 11px;
+            word-break: break-all;
+            font-family: monospace;
+            margin: 10px 0;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -131,25 +139,40 @@
         <span class="close-modal" onclick="fecharModal()">&times;</span>
         <h2 id="modalTitulo"></h2>
         <p id="modalDescricao" style="color: #666; margin-bottom: 15px;"></p>
+        
         <div class="form-group">
             <label>🎫 Quantos números deseja?</label>
             <input type="number" id="qtdCompra" min="1" value="1">
             <button onclick="gerarNumerosAleatorios()">🎲 Gerar Números</button>
         </div>
+        
         <div id="numerosContainer" class="numero-grid"></div>
+        
         <div class="form-group">
             <label>👤 Nome completo</label>
             <input type="text" id="clienteNome" placeholder="Digite seu nome">
         </div>
         <div class="form-group">
-            <label>📧 E-mail</label>
-            <input type="email" id="clienteEmail" placeholder="Digite seu e-mail">
-        </div>
-        <div class="form-group">
             <label>📱 Telefone (WhatsApp)</label>
             <input type="tel" id="clienteTelefone" placeholder="(11) 99999-9999">
         </div>
-        <button id="btnPagar" class="btn-mp" style="display: none;" onclick="pagarComMercadoPago()">💳 Pagar com Mercado Pago</button>
+        
+        <!-- Área do PIX Estático -->
+        <div id="pixArea" style="display: none;">
+            <div class="pix-area">
+                <p><strong>💸 Pague via PIX</strong></p>
+                <p>Valor: <strong id="valorPix">R$ 0,00</strong></p>
+                <!-- ⚠️ SUBSTITUA A LINHA ABAIXO PELA URL DA SUA IMAGEM QR CODE -->
+                <img id="qrCodeImage" src="https://via.placeholder.com/200?text=COLOQUE+SEU+QR+CODE" alt="QR Code PIX">
+                <div class="pix-codigo" id="pixCopiaCola" onclick="copiarPix()">
+                    Clique aqui para copiar o código PIX
+                </div>
+                <button onclick="copiarPix()" class="btn-pix">📋 Copiar Código PIX</button>
+                <p style="font-size: 12px; margin-top: 10px; color: #666;">✅ Após o pagamento, entre em contato no WhatsApp com o comprovante para confirmarmos seus números.</p>
+            </div>
+        </div>
+        
+        <button id="btnMostrarPix" class="btn-pix" style="display: none;" onclick="mostrarPix()">💳 Gerar PIX para Pagamento</button>
         <div id="msgCompra" style="margin-top: 15px;"></div>
     </div>
 </div>
@@ -157,7 +180,13 @@
 <script>
     let rifaAtual = null;
     let numerosGerados = [];
-    let preferenciaId = null;
+    let valorTotal = 0;
+
+    // ⚠️ COLOQUE AQUI O SEU QR CODE ESTÁTICO
+    const QR_CODE_URL = "https://imgur.com/a/5M40DIH";
+    
+    // ⚠️ COLOQUE AQUI O SEU CÓDIGO PIX COPIA E COLA
+    const PIX_CODIGO = "00020101021126580014br.gov.bcb.pix0136415073bf-86c3-40ff-8a8a-da8aa76a94a15204000053039865802BR5917CICERO W L VIEIRA6011BREJO SANTO62070503***6304988B";
 
     function carregarRifas() {
         fetch('/api/rifas')
@@ -170,7 +199,7 @@
                 }
                 container.innerHTML = rifas.map(rifa => `
                     <div class="rifa-card" onclick="abrirCompra(${rifa.id})">
-                        <img src="${rifa.foto || 'https://via.placeholder.com/300x200?text=Rifa'}" alt="${rifa.nome}">
+                        <img src="${rifa.foto || 'https://imgur.com/a/5M40DIH'}" alt="${rifa.nome}">
                         <div class="rifa-info">
                             <h3>${rifa.nome}</h3>
                             <p>${rifa.descricao || ''}</p>
@@ -191,14 +220,14 @@
                 document.getElementById('modalDescricao').innerHTML = rifa.descricao || '';
                 document.getElementById('modalCompra').style.display = 'flex';
                 document.getElementById('numerosContainer').innerHTML = '';
+                document.getElementById('pixArea').style.display = 'none';
+                document.getElementById('btnMostrarPix').style.display = 'none';
                 document.getElementById('msgCompra').innerHTML = '';
-                document.getElementById('btnPagar').style.display = 'none';
                 document.getElementById('clienteNome').value = '';
-                document.getElementById('clienteEmail').value = '';
                 document.getElementById('clienteTelefone').value = '';
                 document.getElementById('qtdCompra').value = '1';
                 numerosGerados = [];
-                preferenciaId = null;
+                valorTotal = 0;
             });
     }
 
@@ -220,71 +249,59 @@
                 alert('❌ ' + data.error);
             } else {
                 numerosGerados = data.numeros;
+                valorTotal = numerosGerados.length * rifaAtual.valor_bilhete;
                 const container = document.getElementById('numerosContainer');
                 container.innerHTML = numerosGerados.map(n => `<div class="numero-item">${n}</div>`).join('');
-                document.getElementById('btnPagar').style.display = 'block';
+                document.getElementById('btnMostrarPix').style.display = 'block';
             }
         });
     }
 
-    function pagarComMercadoPago() {
+    function mostrarPix() {
         const nome = document.getElementById('clienteNome').value.trim();
-        const email = document.getElementById('clienteEmail').value.trim();
         const telefone = document.getElementById('clienteTelefone').value.trim();
         
         if (!nome) {
             alert('Preencha seu nome');
             return;
         }
-        if (!email) {
-            alert('Preencha seu e-mail');
-            return;
-        }
         if (!telefone) {
             alert('Preencha seu telefone');
             return;
         }
-        if (numerosGerados.length === 0) {
-            alert('Gere os números primeiro');
-            return;
-        }
         
-        const valorTotal = numerosGerados.length * rifaAtual.valor_bilhete;
+        document.getElementById('valorPix').innerHTML = `R$ ${valorTotal.toFixed(2)}`;
+        document.getElementById('qrCodeImage').src = QR_CODE_URL;
+        document.getElementById('pixCopiaCola').innerHTML = PIX_CODIGO;
+        document.getElementById('pixArea').style.display = 'block';
+        document.getElementById('btnMostrarPix').style.display = 'none';
         
-        // Botão desabilitado com loading
-        const btn = document.getElementById('btnPagar');
-        const originalText = btn.innerText;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="loading"></span> Processando...';
+        document.getElementById('msgCompra').innerHTML = `
+            <div style="background:#e6ffe6; padding:15px; border-radius:10px; margin-top:10px;">
+                ✅ <strong>Números reservados! Aguardando pagamento.</strong><br>
+                🎫 Números: ${numerosGerados.join(', ')}<br>
+                💰 Valor: R$ ${valorTotal.toFixed(2)}<br>
+                📱 Após pagar, envie o comprovante para confirmar seus números.
+            </div>
+        `;
         
-        fetch('/api/criar-preferencia', {
+        // Salvar reserva no servidor (opcional)
+        fetch('/api/reservar-numeros', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 rifa_id: rifaAtual.id,
                 numeros: numerosGerados,
                 nome_cliente: nome,
-                email_cliente: email,
                 telefone: telefone,
                 valor_total: valorTotal
             })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) {
-                alert('Erro: ' + data.error);
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            } else {
-                // Redirecionar para o checkout do Mercado Pago
-                window.location.href = data.init_point;
-            }
-        })
-        .catch(err => {
-            alert('Erro ao processar pagamento');
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-        });
+        }).catch(err => console.error('Erro ao reservar:', err));
+    }
+
+    function copiarPix() {
+        navigator.clipboard.writeText(PIX_CODIGO);
+        alert('✅ Código PIX copiado!');
     }
 
     function fecharModal() {
