@@ -106,7 +106,7 @@ app.get('/api/rifas/:id', async (req, res) => {
   }
 });
 
-// Buscar números vendidos de uma rifa específica (NOVA ROTA)
+// Buscar números vendidos de uma rifa específica
 app.get('/api/numeros-vendidos/:rifaId', async (req, res) => {
   try {
     const numeros = await db.all(
@@ -175,6 +175,22 @@ app.post('/api/reservar-numeros', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Erro ao reservar números:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Confirmar pagamento (mudar status de reservado para pago)
+app.post('/api/confirmar-pagamento', async (req, res) => {
+  const { rifa_id, numero } = req.body;
+  
+  try {
+    await db.run(
+      'UPDATE numeros_vendidos SET status = "pago" WHERE rifa_id = ? AND numero = ?',
+      rifa_id, numero
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao confirmar pagamento:', error);
     res.status(500).json({ error: error.message });
   }
 });
