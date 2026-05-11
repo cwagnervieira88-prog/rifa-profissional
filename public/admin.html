@@ -43,7 +43,8 @@
         }
         .btn-success { background: #48bb78; }
         .btn-danger { background: #f56565; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 20px; }
+        .btn-warning { background: #f59e0b; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 20px; }
         .rifa-card {
             background: white;
             border-radius: 15px;
@@ -63,18 +64,37 @@
             border-radius: 10px;
             margin-top: 10px;
             font-size: 13px;
-            max-height: 150px;
+            max-height: 200px;
             overflow-y: auto;
         }
-        .numero-individual {
+        .numero-item {
             display: inline-block;
-            background: #667eea;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 20px;
-            margin: 3px;
-            font-size: 12px;
+            margin: 5px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            text-align: center;
+            min-width: 80px;
         }
+        .numero-reservado {
+            background: #f59e0b;
+            color: white;
+        }
+        .numero-pago {
+            background: #48bb78;
+            color: white;
+        }
+        .btn-confirmar {
+            background: #38a169;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+        .btn-confirmar:hover { background: #2f855a; }
         .link-compartilhar {
             background: #f0f0f0;
             padding: 10px;
@@ -91,12 +111,22 @@
             border-radius: 20px;
             text-align: center;
         }
-        .vendido { background: #48bb78; }
-        .reservado { background: #f59e0b; }
         .detalhe-venda {
-            font-size: 11px;
-            margin-top: 5px;
-            color: #666;
+            font-size: 10px;
+            margin-top: 3px;
+            color: rgba(255,255,255,0.9);
+        }
+        .titulo-rifa {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-badge {
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: #e2e8f0;
+            color: #4a5568;
         }
     </style>
 </head>
@@ -156,8 +186,7 @@
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('adminPanel').style.display = 'block';
             carregarRifas();
-            // Atualizar a cada 30 segundos
-            setInterval(carregarRifas, 30000);
+            setInterval(carregarRifas, 15000);
         } else {
             document.getElementById('erroSenha').innerText = 'Senha incorreta!';
         }
@@ -175,29 +204,36 @@
             }
             
             container.innerHTML = await Promise.all(rifas.map(async rifa => {
-                // Buscar números vendidos para esta rifa
                 const vendidosRes = await fetch(`/api/numeros-vendidos/${rifa.id}`);
                 const vendidos = await vendidosRes.json();
                 
+                const pagos = vendidos.filter(v => v.status === 'pago').length;
+                const reservados = vendidos.filter(v => v.status === 'reservado').length;
+                
                 return `
                     <div class="rifa-card">
-                        <img src="${rifa.foto || 'https://via.placeholder.com/400x180?text=Rifa'}" alt="${rifa.nome}">
+                        <img src="${rifa.foto || 'https://via.placeholder.com/450x180?text=Rifa'}" alt="${rifa.nome}">
                         <div class="rifa-info">
-                            <h3>🎯 ${rifa.nome}</h3>
+                            <div class="titulo-rifa">
+                                <h3>🎯 ${rifa.nome}</h3>
+                                <span class="status-badge">💰 R$ ${rifa.valor_bilhete.toFixed(2)}</span>
+                            </div>
                             <p>${rifa.descricao || 'Sem descrição'}</p>
-                            <p><strong>💰 R$ ${rifa.valor_bilhete.toFixed(2)}</strong> / bilhete</p>
-                            <p>🎫 Vendidos: ${vendidos.length} / ${rifa.quantidade_numeros}</p>
+                            <p>🎫 Vendidos: ${pagos + reservados} / ${rifa.quantidade_numeros}  |  ✅ Pagos: ${pagos}  |  🟠 Reservados: ${reservados}</p>
                             
                             <div class="numeros-vendidos">
-                                <strong>📋 Números vendidos/reservados:</strong><br>
+                                <strong>📋 Números:</strong><br>
                                 ${vendidos.length === 0 ? 'Nenhum número vendido ainda' : 
                                     vendidos.map(v => `
-                                        <div class="numero-individual ${v.status === 'pago' ? 'vendido' : 'reservado'}">
+                                        <div class="numero-item ${v.status === 'pago' ? 'numero-pago' : 'numero-reservado'}">
                                             #${v.numero}
                                             <div class="detalhe-venda">
                                                 ${v.nome_cliente}<br>
                                                 ${v.telefone}
                                             </div>
+                                            ${v.status === 'reservado' ? 
+                                                `<button class="btn-confirmar" onclick="confirmarPagamento(${rifa.id}, ${v.numero})">✅ Confirmar PAGO</button>` : 
+                                                '<span style="font-size:10px;">✅ PAGO</span>'}
                                         </div>
                                     `).join('')}
                             </div>
@@ -214,6 +250,29 @@
         } catch (error) {
             console.error('Erro ao carregar rifas:', error);
             document.getElementById('rifasList').innerHTML = '<p style="color:red; text-align:center;">Erro ao carregar rifas</p>';
+        }
+    }
+
+    async function confirmarPagamento(rifaId, numero) {
+        if (!confirm(`Confirmar pagamento do número ${numero}?`)) return;
+        
+        try {
+            const response = await fetch('/api/confirmar-pagamento', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rifa_id: rifaId, numero: numero })
+            });
+            
+            if (response.ok) {
+                alert('✅ Pagamento confirmado! Número marcado como PAGO.');
+                carregarRifas();
+            } else {
+                const erro = await response.json();
+                alert('❌ Erro: ' + erro.error);
+            }
+        } catch (error) {
+            console.error('Erro ao confirmar pagamento:', error);
+            alert('❌ Erro ao confirmar pagamento');
         }
     }
 
