@@ -36,7 +36,7 @@ async function initDatabase() {
       numero INTEGER NOT NULL,
       nome_cliente TEXT NOT NULL,
       telefone TEXT NOT NULL,
-      status TEXT DEFAULT 'pendente',
+      status TEXT DEFAULT 'reservado',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(rifa_id) REFERENCES rifas(id)
     );
@@ -54,6 +54,9 @@ async function initDatabase() {
   }
 }
 
+// ========== ROTAS ==========
+
+// Criar nova rifa
 app.post('/api/rifas', async (req, res) => {
   const { nome, foto, quantidade_numeros, valor_bilhete, descricao, chave_pix } = req.body;
   try {
@@ -68,11 +71,12 @@ app.post('/api/rifas', async (req, res) => {
   }
 });
 
+// Listar todas rifas
 app.get('/api/rifas', async (req, res) => {
   try {
     const rifas = await db.all('SELECT * FROM rifas ORDER BY created_at DESC');
     for (let rifa of rifas) {
-      const vendidos = await db.get('SELECT COUNT(*) as total FROM numeros_vendidos WHERE rifa_id = ? AND status = "pago"', rifa.id);
+      const vendidos = await db.get('SELECT COUNT(*) as total FROM numeros_vendidos WHERE rifa_id = ?', rifa.id);
       rifa.numeros_vendidos = vendidos ? vendidos.total : 0;
     }
     res.json(rifas);
@@ -82,12 +86,13 @@ app.get('/api/rifas', async (req, res) => {
   }
 });
 
+// Buscar rifa específica
 app.get('/api/rifas/:id', async (req, res) => {
   try {
     const rifa = await db.get('SELECT * FROM rifas WHERE id = ?', req.params.id);
     if (!rifa) return res.status(404).json({ error: 'Rifa não encontrada' });
     
-    const numerosOcupados = await db.all('SELECT numero FROM numeros_vendidos WHERE rifa_id = ? AND status = "pago"', rifa.id);
+    const numerosOcupados = await db.all('SELECT numero FROM numeros_vendidos WHERE rifa_id = ?', rifa.id);
     rifa.numeros_disponiveis = [];
     for (let i = 1; i <= rifa.quantidade_numeros; i++) {
       if (!numerosOcupados.some(n => n.numero === i)) {
@@ -101,6 +106,21 @@ app.get('/api/rifas/:id', async (req, res) => {
   }
 });
 
+// Buscar números vendidos de uma rifa específica (NOVA ROTA)
+app.get('/api/numeros-vendidos/:rifaId', async (req, res) => {
+  try {
+    const numeros = await db.all(
+      'SELECT numero, nome_cliente, telefone, status, created_at FROM numeros_vendidos WHERE rifa_id = ? ORDER BY numero',
+      req.params.rifaId
+    );
+    res.json(numeros);
+  } catch (error) {
+    console.error('Erro ao buscar números vendidos:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Gerar números aleatórios disponíveis
 app.post('/api/gerar-numeros', async (req, res) => {
   const { rifa_id, quantidade } = req.body;
   
@@ -108,7 +128,7 @@ app.post('/api/gerar-numeros', async (req, res) => {
     const rifa = await db.get('SELECT * FROM rifas WHERE id = ?', rifa_id);
     if (!rifa) return res.status(404).json({ error: 'Rifa não encontrada' });
     
-    const numerosOcupados = await db.all('SELECT numero FROM numeros_vendidos WHERE rifa_id = ? AND status = "pago"', rifa_id);
+    const numerosOcupados = await db.all('SELECT numero FROM numeros_vendidos WHERE rifa_id = ?', rifa_id);
     const ocupadosSet = new Set(numerosOcupados.map(n => n.numero));
     const disponiveis = [];
     
@@ -134,13 +154,14 @@ app.post('/api/gerar-numeros', async (req, res) => {
   }
 });
 
+// Reservar números (quando cliente confirma compra)
 app.post('/api/reservar-numeros', async (req, res) => {
   const { rifa_id, numeros, nome_cliente, telefone } = req.body;
   
   try {
     for (let numero of numeros) {
       const existente = await db.get(
-        'SELECT * FROM numeros_vendidos WHERE rifa_id = ? AND numero = ? AND status = "pago"',
+        'SELECT * FROM numeros_vendidos WHERE rifa_id = ? AND numero = ?',
         rifa_id, numero
       );
       
@@ -158,10 +179,12 @@ app.post('/api/reservar-numeros', async (req, res) => {
   }
 });
 
+// Servir frontend (sempre por último)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Iniciar servidor
 const PORT = process.env.PORT || 3000;
 initDatabase().then(() => {
   app.listen(PORT, () => {
