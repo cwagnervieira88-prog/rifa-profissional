@@ -12,7 +12,7 @@
             min-height: 100vh;
             padding: 20px;
         }
-        .container { max-width: 1200px; margin: 0 auto; }
+        .container { max-width: 1400px; margin: 0 auto; }
         .card {
             background: white;
             border-radius: 20px;
@@ -43,7 +43,7 @@
         }
         .btn-success { background: #48bb78; }
         .btn-danger { background: #f56565; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 20px; }
         .rifa-card {
             background: white;
             border-radius: 15px;
@@ -57,6 +57,24 @@
             object-fit: cover;
         }
         .rifa-info { padding: 15px; }
+        .numeros-vendidos {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 10px;
+            font-size: 13px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .numero-individual {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            margin: 3px;
+            font-size: 12px;
+        }
         .link-compartilhar {
             background: #f0f0f0;
             padding: 10px;
@@ -64,11 +82,6 @@
             font-size: 12px;
             word-break: break-all;
             margin-top: 10px;
-        }
-        .link-compartilhar input {
-            font-size: 11px;
-            padding: 8px;
-            margin-top: 5px;
         }
         .login-container {
             max-width: 400px;
@@ -78,26 +91,24 @@
             border-radius: 20px;
             text-align: center;
         }
-        .login-container input {
-            margin: 10px 0;
-            width: 100%;
+        .vendido { background: #48bb78; }
+        .reservado { background: #f59e0b; }
+        .detalhe-venda {
+            font-size: 11px;
+            margin-top: 5px;
+            color: #666;
         }
-        h3 { margin-bottom: 8px; }
-        p { margin-bottom: 5px; color: #555; }
     </style>
 </head>
 <body>
 <div class="container" id="app">
-    <!-- Tela de Login -->
     <div id="loginScreen" class="login-container" style="display: none;">
         <h2>🔐 Acesso Administrativo</h2>
-        <p style="margin-bottom: 15px; color: #666;">Digite a senha para continuar</p>
         <input type="password" id="senhaAdmin" placeholder="Digite a senha">
-        <button onclick="verificarSenha()" style="width: 100%;">Entrar</button>
+        <button onclick="verificarSenha()">Entrar</button>
         <p style="margin-top: 10px; color: red; font-size: 12px;" id="erroSenha"></p>
     </div>
 
-    <!-- Painel Admin (só aparece após login) -->
     <div id="adminPanel" style="display: none;">
         <div class="card">
             <h2>📱 Criar Nova Rifa</h2>
@@ -110,8 +121,8 @@
                 <input type="text" id="fotoRifa" placeholder="https://exemplo.com/foto.jpg">
             </div>
             <div class="form-group">
-                <label>🔢 Quantidade de Números (máx 500)</label>
-                <input type="number" id="qtdNumeros" min="1" max="500" value="100">
+                <label>🔢 Quantidade de Números</label>
+                <input type="number" id="qtdNumeros" value="100">
             </div>
             <div class="form-group">
                 <label>💰 Valor por Bilhete (R$)</label>
@@ -119,7 +130,7 @@
             </div>
             <div class="form-group">
                 <label>📝 Descrição</label>
-                <textarea id="descricao" rows="3" placeholder="Prêmio, data do sorteio..."></textarea>
+                <textarea id="descricao" rows="3"></textarea>
             </div>
             <div class="form-group">
                 <label>💳 Chave PIX</label>
@@ -137,7 +148,7 @@
 </div>
 
 <script>
-    const SENHA_ADMIN = "admin123"; // Mude para sua senha secreta
+    const SENHA_ADMIN = "admin123";
 
     function verificarSenha() {
         const senha = document.getElementById('senhaAdmin').value;
@@ -145,82 +156,113 @@
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('adminPanel').style.display = 'block';
             carregarRifas();
+            // Atualizar a cada 30 segundos
+            setInterval(carregarRifas, 30000);
         } else {
             document.getElementById('erroSenha').innerText = 'Senha incorreta!';
         }
     }
 
-    function carregarRifas() {
-        fetch('/api/rifas')
-            .then(res => res.json())
-            .then(rifas => {
-                const container = document.getElementById('rifasList');
-                if (rifas.length === 0) {
-                    container.innerHTML = '<p style="grid-column:1/-1; text-align:center;">Nenhuma rifa criada ainda.</p>';
-                    return;
-                }
-                container.innerHTML = rifas.map(rifa => `
+    async function carregarRifas() {
+        try {
+            const response = await fetch('/api/rifas');
+            const rifas = await response.json();
+            const container = document.getElementById('rifasList');
+            
+            if (rifas.length === 0) {
+                container.innerHTML = '<p style="grid-column:1/-1; text-align:center;">Nenhuma rifa criada ainda.</p>';
+                return;
+            }
+            
+            container.innerHTML = await Promise.all(rifas.map(async rifa => {
+                // Buscar números vendidos para esta rifa
+                const vendidosRes = await fetch(`/api/numeros-vendidos/${rifa.id}`);
+                const vendidos = await vendidosRes.json();
+                
+                return `
                     <div class="rifa-card">
-                        <img src="${rifa.foto || 'https://via.placeholder.com/350x180?text=Rifa'}" alt="${rifa.nome}" onerror="this.src='https://via.placeholder.com/350x180?text=Sem+Foto'">
+                        <img src="${rifa.foto || 'https://via.placeholder.com/400x180?text=Rifa'}" alt="${rifa.nome}">
                         <div class="rifa-info">
                             <h3>🎯 ${rifa.nome}</h3>
                             <p>${rifa.descricao || 'Sem descrição'}</p>
                             <p><strong>💰 R$ ${rifa.valor_bilhete.toFixed(2)}</strong> / bilhete</p>
-                            <p>🎫 Vendidos: ${rifa.numeros_vendidos || 0} / ${rifa.quantidade_numeros}</p>
-                            <p>💳 PIX: ${rifa.chave_pix || 'não definida'}</p>
+                            <p>🎫 Vendidos: ${vendidos.length} / ${rifa.quantidade_numeros}</p>
+                            
+                            <div class="numeros-vendidos">
+                                <strong>📋 Números vendidos/reservados:</strong><br>
+                                ${vendidos.length === 0 ? 'Nenhum número vendido ainda' : 
+                                    vendidos.map(v => `
+                                        <div class="numero-individual ${v.status === 'pago' ? 'vendido' : 'reservado'}">
+                                            #${v.numero}
+                                            <div class="detalhe-venda">
+                                                ${v.nome_cliente}<br>
+                                                ${v.telefone}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                            </div>
+                            
                             <div class="link-compartilhar">
-                                🔗 <strong>Link para o cliente:</strong><br>
-                                <input type="text" value="${window.location.origin}/?rifa=${rifa.id}" readonly onclick="this.select()">
+                                🔗 Link para o cliente:<br>
+                                <input type="text" value="${window.location.origin}/?rifa=${rifa.id}" readonly onclick="this.select()" style="width:100%; font-size:11px;">
                                 <button onclick="copiarLink('${window.location.origin}/?rifa=${rifa.id}')" style="margin-top:8px; padding:6px 12px; font-size:12px;">📋 Copiar Link</button>
                             </div>
                         </div>
                     </div>
-                `).join('');
-            });
+                `;
+            })).join('');
+        } catch (error) {
+            console.error('Erro ao carregar rifas:', error);
+            document.getElementById('rifasList').innerHTML = '<p style="color:red; text-align:center;">Erro ao carregar rifas</p>';
+        }
     }
 
-    function copiarLink(link) {
-        navigator.clipboard.writeText(link);
-        alert('✅ Link copiado! Compartilhe com seus clientes.');
-    }
-
-    function criarRifa() {
+    async function criarRifa() {
         const dados = {
-            nome: document.getElementById('nomeRifa').value,
-            foto: document.getElementById('fotoRifa').value,
+            nome: document.getElementById('nomeRifa').value.trim(),
+            foto: document.getElementById('fotoRifa').value.trim(),
             quantidade_numeros: parseInt(document.getElementById('qtdNumeros').value),
             valor_bilhete: parseFloat(document.getElementById('valorBilhete').value),
-            descricao: document.getElementById('descricao').value,
-            chave_pix: document.getElementById('chavePix').value
+            descricao: document.getElementById('descricao').value.trim(),
+            chave_pix: document.getElementById('chavePix').value.trim()
         };
         
         if (!dados.nome) {
-            alert('Preencha o nome da rifa');
-            return;
-        }
-        if (dados.valor_bilhete <= 0) {
-            alert('Valor do bilhete deve ser maior que zero');
+            alert('❌ Preencha o nome da rifa');
             return;
         }
         if (!dados.chave_pix) {
-            alert('Preencha a chave PIX');
+            alert('❌ Preencha a chave PIX');
             return;
         }
-
-        fetch('/api/rifas', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dados)
-        })
-        .then(response => response.json())
-        .then(() => {
-            alert('✅ Rifa criada com sucesso!');
-            limparForm();
-            carregarRifas();
-        })
-        .catch(erro => {
-            alert('❌ Erro ao criar rifa: ' + erro);
-        });
+        
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.disabled = true;
+        btn.innerText = '⏳ Criando...';
+        
+        try {
+            const response = await fetch('/api/rifas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dados)
+            });
+            
+            if (response.ok) {
+                alert('✅ Rifa criada com sucesso!');
+                limparForm();
+                carregarRifas();
+            } else {
+                const erro = await response.json();
+                alert('❌ Erro: ' + (erro.error || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            alert('❌ Erro de conexão com o servidor');
+        } finally {
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
     }
 
     function limparForm() {
@@ -232,7 +274,11 @@
         document.getElementById('chavePix').value = '';
     }
 
-    // Mostrar tela de login primeiro
+    function copiarLink(link) {
+        navigator.clipboard.writeText(link);
+        alert('✅ Link copiado!');
+    }
+
     document.getElementById('loginScreen').style.display = 'block';
 </script>
 </body>
