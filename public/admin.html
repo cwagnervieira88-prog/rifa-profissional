@@ -64,7 +64,7 @@
             border-radius: 10px;
             margin-top: 10px;
             font-size: 13px;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
         }
         .numero-item {
@@ -72,9 +72,9 @@
             margin: 5px;
             padding: 8px 12px;
             border-radius: 8px;
-            font-size: 13px;
+            font-size: 12px;
             text-align: center;
-            min-width: 80px;
+            min-width: 90px;
         }
         .numero-reservado {
             background: #f59e0b;
@@ -88,11 +88,12 @@
             background: #38a169;
             color: white;
             border: none;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 10px;
             cursor: pointer;
-            margin-left: 5px;
+            margin-top: 5px;
+            margin-right: 0;
         }
         .btn-confirmar:hover { background: #2f855a; }
         .link-compartilhar {
@@ -127,6 +128,11 @@
             border-radius: 20px;
             background: #e2e8f0;
             color: #4a5568;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
         }
     </style>
 </head>
@@ -172,7 +178,9 @@
 
         <div class="card">
             <h2>🎯 Suas Rifas</h2>
-            <div id="rifasList" class="grid"></div>
+            <div id="rifasList" class="grid">
+                <div class="loading">Carregando rifas...</div>
+            </div>
         </div>
     </div>
 </div>
@@ -203,54 +211,69 @@
                 return;
             }
             
-            container.innerHTML = await Promise.all(rifas.map(async rifa => {
-                const vendidosRes = await fetch(`/api/numeros-vendidos/${rifa.id}`);
-                const vendidos = await vendidosRes.json();
-                
-                const pagos = vendidos.filter(v => v.status === 'pago').length;
-                const reservados = vendidos.filter(v => v.status === 'reservado').length;
-                
-                return `
-                    <div class="rifa-card">
-                        <img src="${rifa.foto || 'https://via.placeholder.com/450x180?text=Rifa'}" alt="${rifa.nome}">
-                        <div class="rifa-info">
-                            <div class="titulo-rifa">
-                                <h3>🎯 ${rifa.nome}</h3>
-                                <span class="status-badge">💰 R$ ${rifa.valor_bilhete.toFixed(2)}</span>
-                            </div>
-                            <p>${rifa.descricao || 'Sem descrição'}</p>
-                            <p>🎫 Vendidos: ${pagos + reservados} / ${rifa.quantidade_numeros}  |  ✅ Pagos: ${pagos}  |  🟠 Reservados: ${reservados}</p>
-                            
-                            <div class="numeros-vendidos">
-                                <strong>📋 Números:</strong><br>
-                                ${vendidos.length === 0 ? 'Nenhum número vendido ainda' : 
-                                    vendidos.map(v => `
-                                        <div class="numero-item ${v.status === 'pago' ? 'numero-pago' : 'numero-reservado'}">
-                                            #${v.numero}
-                                            <div class="detalhe-venda">
-                                                ${v.nome_cliente}<br>
-                                                ${v.telefone}
+            // Processar cada rifa
+            let html = '';
+            for (const rifa of rifas) {
+                try {
+                    const vendidosRes = await fetch(`/api/numeros-vendidos/${rifa.id}`);
+                    const vendidos = await vendidosRes.json();
+                    
+                    const pagos = vendidos.filter(v => v.status === 'pago').length;
+                    const reservados = vendidos.filter(v => v.status === 'reservado').length;
+                    
+                    html += `
+                        <div class="rifa-card">
+                            <img src="${rifa.foto || 'https://via.placeholder.com/450x180?text=Rifa'}" alt="${rifa.nome}">
+                            <div class="rifa-info">
+                                <div class="titulo-rifa">
+                                    <h3>🎯 ${escapeHtml(rifa.nome)}</h3>
+                                    <span class="status-badge">💰 R$ ${rifa.valor_bilhete.toFixed(2)}</span>
+                                </div>
+                                <p>${escapeHtml(rifa.descricao || 'Sem descrição')}</p>
+                                <p>🎫 Vendidos: ${pagos + reservados} / ${rifa.quantidade_numeros}  |  ✅ Pagos: ${pagos}  |  🟠 Reservados: ${reservados}</p>
+                                
+                                <div class="numeros-vendidos">
+                                    <strong>📋 Números:</strong><br>
+                                    ${vendidos.length === 0 ? 'Nenhum número vendido ainda' : 
+                                        vendidos.map(v => `
+                                            <div class="numero-item ${v.status === 'pago' ? 'numero-pago' : 'numero-reservado'}">
+                                                #${v.numero}
+                                                <div class="detalhe-venda">
+                                                    ${escapeHtml(v.nome_cliente)}<br>
+                                                    ${escapeHtml(v.telefone)}
+                                                </div>
+                                                ${v.status === 'reservado' ? 
+                                                    `<button class="btn-confirmar" onclick="confirmarPagamento(${rifa.id}, ${v.numero})">✅ Confirmar PAGO</button>` : 
+                                                    '<span style="font-size:10px;">✅ PAGO</span>'}
                                             </div>
-                                            ${v.status === 'reservado' ? 
-                                                `<button class="btn-confirmar" onclick="confirmarPagamento(${rifa.id}, ${v.numero})">✅ Confirmar PAGO</button>` : 
-                                                '<span style="font-size:10px;">✅ PAGO</span>'}
-                                        </div>
-                                    `).join('')}
-                            </div>
-                            
-                            <div class="link-compartilhar">
-                                🔗 Link para o cliente:<br>
-                                <input type="text" value="${window.location.origin}/?rifa=${rifa.id}" readonly onclick="this.select()" style="width:100%; font-size:11px;">
-                                <button onclick="copiarLink('${window.location.origin}/?rifa=${rifa.id}')" style="margin-top:8px; padding:6px 12px; font-size:12px;">📋 Copiar Link</button>
+                                        `).join('')}
+                                </div>
+                                
+                                <div class="link-compartilhar">
+                                    🔗 Link para o cliente:<br>
+                                    <input type="text" value="${window.location.origin}/?rifa=${rifa.id}" readonly onclick="this.select()" style="width:100%; font-size:11px;">
+                                    <button onclick="copiarLink('${window.location.origin}/?rifa=${rifa.id}')" style="margin-top:8px; padding:6px 12px; font-size:12px;">📋 Copiar Link</button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
-            })).join('');
+                    `;
+                } catch (err) {
+                    console.error('Erro ao processar rifa:', err);
+                    html += `<div class="rifa-card"><div class="rifa-info">Erro ao carregar rifa ${escapeHtml(rifa.nome)}</div></div>`;
+                }
+            }
+            container.innerHTML = html;
         } catch (error) {
             console.error('Erro ao carregar rifas:', error);
-            document.getElementById('rifasList').innerHTML = '<p style="color:red; text-align:center;">Erro ao carregar rifas</p>';
+            document.getElementById('rifasList').innerHTML = '<p style="color:red; text-align:center;">Erro ao carregar rifas. Verifique se o servidor está rodando.</p>';
         }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     async function confirmarPagamento(rifaId, numero) {
@@ -259,7 +282,7 @@
         try {
             const response = await fetch('/api/confirmar-pagamento', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type':application/json' },
                 body: JSON.stringify({ rifa_id: rifaId, numero: numero })
             });
             
@@ -303,7 +326,7 @@
         try {
             const response = await fetch('/api/rifas', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type':'application/json' },
                 body: JSON.stringify(dados)
             });
             
