@@ -54,8 +54,6 @@ async function initDatabase() {
   }
 }
 
-// ========== ROTAS ==========
-
 // Criar nova rifa
 app.post('/api/rifas', async (req, res) => {
   const { nome, foto, quantidade_numeros, valor_bilhete, descricao, chave_pix } = req.body;
@@ -106,7 +104,7 @@ app.get('/api/rifas/:id', async (req, res) => {
   }
 });
 
-// Buscar números vendidos de uma rifa específica
+// Buscar números vendidos de uma rifa
 app.get('/api/numeros-vendidos/:rifaId', async (req, res) => {
   try {
     const numeros = await db.all(
@@ -120,7 +118,7 @@ app.get('/api/numeros-vendidos/:rifaId', async (req, res) => {
   }
 });
 
-// Gerar números aleatórios disponíveis
+// Gerar números aleatórios
 app.post('/api/gerar-numeros', async (req, res) => {
   const { rifa_id, quantidade } = req.body;
   
@@ -154,7 +152,7 @@ app.post('/api/gerar-numeros', async (req, res) => {
   }
 });
 
-// Reservar números (quando cliente confirma compra)
+// Reservar números
 app.post('/api/reservar-numeros', async (req, res) => {
   const { rifa_id, numeros, nome_cliente, telefone } = req.body;
   
@@ -179,7 +177,7 @@ app.post('/api/reservar-numeros', async (req, res) => {
   }
 });
 
-// Confirmar pagamento (mudar status de reservado para pago)
+// Confirmar pagamento
 app.post('/api/confirmar-pagamento', async (req, res) => {
   const { rifa_id, numero } = req.body;
   
@@ -195,12 +193,11 @@ app.post('/api/confirmar-pagamento', async (req, res) => {
   }
 });
 
-// Servir frontend (sempre por último)
+// Servir frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Iniciar servidor
 const PORT = process.env.PORT || 3000;
 initDatabase().then(() => {
   app.listen(PORT, () => {
