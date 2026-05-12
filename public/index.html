@@ -58,7 +58,7 @@
             background: white;
             border-radius: 20px;
             padding: 30px;
-            max-width: 500px;
+            max-width: 550px;
             width: 90%;
             max-height: 90%;
             overflow-y: auto;
@@ -91,11 +91,10 @@
         }
         .btn-success { background: #48bb78; }
         .btn-pix { background: #32BCAD; }
-        .btn-whatsapp { 
-            background: #25D366; 
-            margin-top: 5px;
-        }
+        .btn-whatsapp { background: #25D366; margin-top: 5px; }
         .btn-whatsapp:hover { background: #128C7E; }
+        .btn-pdf { background: #dc3545; margin-top: 5px; }
+        .btn-pdf:hover { background: #bb2d3b; }
         .close-modal {
             float: right;
             font-size: 28px;
@@ -155,13 +154,13 @@
             transition: transform 0.3s;
             z-index: 1000;
         }
-        .whatsapp-fixo:hover {
-            transform: scale(1.1);
+        .whatsapp-fixo:hover { transform: scale(1.1); }
+        .botoes-compra {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
         }
-        .whatsapp-fixo img {
-            width: 35px;
-            height: 35px;
-        }
+        .botoes-compra button { margin-top: 0; }
     </style>
 </head>
 <body>
@@ -217,12 +216,15 @@
             <div class="pix-area">
                 <p><strong>💸 Pague via PIX</strong></p>
                 <p>Valor: <strong id="valorPix">R$ 0,00</strong></p>
-                <img id="qrCodeImage" src="https://via.placeholder.com/200?text=QR+CODE" alt="QR Code PIX">
+                <img id="qrCodeImage" src="" alt="QR Code PIX">
                 <div class="pix-codigo" id="pixCopiaCola" onclick="copiarPix()">
                     Clique aqui para copiar o código PIX
                 </div>
                 <button onclick="copiarPix()" class="btn-pix">📋 Copiar Código PIX</button>
-                <button id="btnWhatsappCompra" class="btn-whatsapp" style="display: none;" onclick="enviarWhatsAppConfirmacao()">📱 Enviar comprovante no WhatsApp</button>
+                <div class="botoes-compra">
+                    <button id="btnWhatsappCompra" class="btn-whatsapp" onclick="enviarWhatsAppConfirmacao()">📱 Enviar comprovante</button>
+                    <button id="btnBaixarPDF" class="btn-pdf" onclick="baixarPDF()">📄 Baixar comprovante PDF</button>
+                </div>
                 <p style="font-size: 12px; margin-top: 10px; color: #666;">✅ Após o pagamento, envie o comprovante no WhatsApp para confirmarmos seus números.</p>
             </div>
         </div>
@@ -232,26 +234,22 @@
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-    // Configurações
-    const WHATSAPP_NUMBER = "5588988594944"; // Número do administrador
-    const QR_CODE_URL = "https://imgur.com/a/5M40DIH";
+    // Configurações - SUBSTITUA PELOS SEUS DADOS REAIS
+    const WHATSAPP_NUMBER = "5588988594944";
+    const QR_CODE_URL = "https://imgur.com/a/XSRO9wC";
     const PIX_CODIGO = "00020101021126580014br.gov.bcb.pix0136415073bf-86c3-40ff-8a8a-da8aa76a94a15204000053039865802BR5917CICERO W L VIEIRA6011BREJO SANTO62070503***6304988B";
 
     let rifaAtual = null;
     let numerosGerados = [];
     let valorTotal = 0;
     let rifaEspecificaId = null;
-    let clienteAtual = { nome: '', telefone: '' };
+    let dadosCompraAtual = { nome: '', telefone: '' };
+    let pixExibido = false;
 
     function abrirWhatsApp() {
         window.open(`https://wa.me/${WHATSAPP_NUMBER}`, '_blank');
-    }
-
-    function enviarWhatsAppConfirmacao() {
-        const mensagem = `Olá! Acabei de fazer um pedido na rifa "${rifaAtual.nome}".\n\n📋 Números: ${numerosGerados.join(', ')}\n💰 Valor: R$ ${valorTotal.toFixed(2)}\n👤 Nome: ${clienteAtual.nome}\n📱 Telefone: ${clienteAtual.telefone}\n\n✅ Já efetuei o pagamento via PIX. Segue comprovante em anexo.`;
-        const msgEncoded = encodeURIComponent(mensagem);
-        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msgEncoded}`, '_blank');
     }
 
     function getRifaIdFromURL() {
@@ -271,7 +269,7 @@
                 rifas = rifas.filter(r => r.id == rifaId);
                 if (rifas.length > 0) {
                     document.getElementById('descricaoHeader').innerHTML = `🎟️ ${rifas[0].nome}`;
-                    document.getElementById('voltarDiv').style.display = 'block';
+                    document.getElementById('voltarDiv').style.display = 'none';
                 } else {
                     document.getElementById('descricaoHeader').innerHTML = 'Rifa não encontrada';
                 }
@@ -308,6 +306,11 @@
         window.location.href = window.location.origin;
     }
 
+    function fecharModal() {
+        document.getElementById('modalCompra').style.display = 'none';
+        pixExibido = false;
+    }
+
     async function abrirCompra(id) {
         const response = await fetch(`/api/rifas/${id}`);
         rifaAtual = await response.json();
@@ -324,10 +327,7 @@
         document.getElementById('qtdCompra').value = '1';
         numerosGerados = [];
         valorTotal = 0;
-    }
-
-    function fecharModal() {
-        document.getElementById('modalCompra').style.display = 'none';
+        pixExibido = false;
     }
 
     async function gerarNumerosAleatorios() {
@@ -352,6 +352,8 @@
             const container = document.getElementById('numerosContainer');
             container.innerHTML = numerosGerados.map(n => `<div class="numero-item">${n}</div>`).join('');
             document.getElementById('btnMostrarPix').style.display = 'block';
+            document.getElementById('pixArea').style.display = 'none';
+            pixExibido = false;
         }
     }
 
@@ -368,14 +370,13 @@
             return;
         }
         
-        clienteAtual = { nome, telefone };
+        dadosCompraAtual = { nome, telefone };
         
         document.getElementById('valorPix').innerHTML = `R$ ${valorTotal.toFixed(2)}`;
         document.getElementById('qrCodeImage').src = QR_CODE_URL;
         document.getElementById('pixCopiaCola').innerHTML = PIX_CODIGO;
         document.getElementById('pixArea').style.display = 'block';
         document.getElementById('btnMostrarPix').style.display = 'none';
-        document.getElementById('btnWhatsappCompra').style.display = 'block';
         
         document.getElementById('msgCompra').innerHTML = `
             <div style="background:#e6ffe6; padding:15px; border-radius:10px; margin-top:10px;">
@@ -396,11 +397,55 @@
                 telefone: telefone
             })
         });
+        
+        pixExibido = true;
     }
 
     function copiarPix() {
         navigator.clipboard.writeText(PIX_CODIGO);
         alert('✅ Código PIX copiado!');
+    }
+
+    function enviarWhatsAppConfirmacao() {
+        const mensagem = `Olá! Acabei de fazer um pedido na rifa "${rifaAtual.nome}".\n\n📋 Números: ${numerosGerados.join(', ')}\n💰 Valor: R$ ${valorTotal.toFixed(2)}\n👤 Nome: ${dadosCompraAtual.nome}\n📱 Telefone: ${dadosCompraAtual.telefone}\n\n✅ Já efetuei o pagamento via PIX. Segue comprovante em anexo.`;
+        const msgEncoded = encodeURIComponent(mensagem);
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msgEncoded}`, '_blank');
+    }
+
+    function baixarPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        const dataAtual = new Date().toLocaleString('pt-BR');
+        
+        doc.setFontSize(20);
+        doc.setTextColor(40, 60, 90);
+        doc.text("COMPROVANTE DE RESERVA", 105, 20, { align: "center" });
+        
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Data: ${dataAtual}`, 20, 40);
+        doc.text(`Rifa: ${rifaAtual.nome}`, 20, 55);
+        doc.text(`Números sorteados: ${numerosGerados.join(', ')}`, 20, 70);
+        doc.text(`Quantidade de números: ${numerosGerados.length}`, 20, 85);
+        doc.text(`Valor unitário: R$ ${rifaAtual.valor_bilhete.toFixed(2)}`, 20, 100);
+        doc.text(`Valor total: R$ ${valorTotal.toFixed(2)}`, 20, 115);
+        doc.text(`Nome: ${dadosCompraAtual.nome}`, 20, 130);
+        doc.text(`Telefone: ${dadosCompraAtual.telefone}`, 20, 145);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text("Instruções de pagamento:", 20, 165);
+        doc.text("1. Copie o código PIX ou escaneie o QR Code", 25, 175);
+        doc.text("2. Realize o pagamento no seu banco", 25, 185);
+        doc.text("3. Envie o comprovante pelo WhatsApp", 25, 195);
+        doc.text("4. Aguarde a confirmação dos seus números", 25, 205);
+        
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Código PIX: ${PIX_CODIGO.substring(0, 50)}...`, 20, 230);
+        
+        doc.save(`comprovante_rifa_${rifaAtual.id}_${Date.now()}.pdf`);
     }
 
     window.onclick = function(event) {
