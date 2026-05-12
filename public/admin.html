@@ -43,7 +43,6 @@
         }
         .btn-success { background: #48bb78; }
         .btn-danger { background: #f56565; }
-        .btn-warning { background: #f59e0b; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 20px; }
         .rifa-card {
             background: white;
@@ -93,9 +92,7 @@
             font-size: 10px;
             cursor: pointer;
             margin-top: 5px;
-            margin-right: 0;
         }
-        .btn-confirmar:hover { background: #2f855a; }
         .link-compartilhar {
             background: #f0f0f0;
             padding: 10px;
@@ -112,36 +109,26 @@
             border-radius: 20px;
             text-align: center;
         }
+        .login-container input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
         .detalhe-venda {
             font-size: 10px;
             margin-top: 3px;
             color: rgba(255,255,255,0.9);
         }
-        .titulo-rifa {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .status-badge {
-            font-size: 12px;
-            padding: 4px 12px;
-            border-radius: 20px;
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
     </style>
 </head>
 <body>
-<div class="container" id="app">
-    <div id="loginScreen" class="login-container" style="display: none;">
+<div class="container">
+    <div id="loginScreen" class="login-container">
         <h2>🔐 Acesso Administrativo</h2>
         <input type="password" id="senhaAdmin" placeholder="Digite a senha">
-        <button onclick="verificarSenha()">Entrar</button>
+        <button onclick="verificarSenha()" style="width:100%">Entrar</button>
         <p style="margin-top: 10px; color: red; font-size: 12px;" id="erroSenha"></p>
     </div>
 
@@ -179,7 +166,7 @@
         <div class="card">
             <h2>🎯 Suas Rifas</h2>
             <div id="rifasList" class="grid">
-                <div class="loading">Carregando rifas...</div>
+                <p>Carregando rifas...</p>
             </div>
         </div>
     </div>
@@ -188,7 +175,7 @@
 <script>
     const SENHA_ADMIN = "admin123";
 
-    function verificarSenha() {
+    async function verificarSenha() {
         const senha = document.getElementById('senhaAdmin').value;
         if (senha === SENHA_ADMIN) {
             document.getElementById('loginScreen').style.display = 'none';
@@ -207,11 +194,10 @@
             const container = document.getElementById('rifasList');
             
             if (rifas.length === 0) {
-                container.innerHTML = '<p style="grid-column:1/-1; text-align:center;">Nenhuma rifa criada ainda.</p>';
+                container.innerHTML = '<p style="text-align:center;">Nenhuma rifa criada ainda.</p>';
                 return;
             }
             
-            // Processar cada rifa
             let html = '';
             for (const rifa of rifas) {
                 try {
@@ -225,12 +211,10 @@
                         <div class="rifa-card">
                             <img src="${rifa.foto || 'https://via.placeholder.com/450x180?text=Rifa'}" alt="${rifa.nome}">
                             <div class="rifa-info">
-                                <div class="titulo-rifa">
-                                    <h3>🎯 ${escapeHtml(rifa.nome)}</h3>
-                                    <span class="status-badge">💰 R$ ${rifa.valor_bilhete.toFixed(2)}</span>
-                                </div>
-                                <p>${escapeHtml(rifa.descricao || 'Sem descrição')}</p>
-                                <p>🎫 Vendidos: ${pagos + reservados} / ${rifa.quantidade_numeros}  |  ✅ Pagos: ${pagos}  |  🟠 Reservados: ${reservados}</p>
+                                <h3>🎯 ${rifa.nome}</h3>
+                                <p>${rifa.descricao || 'Sem descrição'}</p>
+                                <p>💰 R$ ${rifa.valor_bilhete.toFixed(2)} / bilhete</p>
+                                <p>🎫 Vendidos: ${pagos + reservados} / ${rifa.quantidade_numeros} | ✅ Pagos: ${pagos} | 🟠 Reservados: ${reservados}</p>
                                 
                                 <div class="numeros-vendidos">
                                     <strong>📋 Números:</strong><br>
@@ -239,41 +223,33 @@
                                             <div class="numero-item ${v.status === 'pago' ? 'numero-pago' : 'numero-reservado'}">
                                                 #${v.numero}
                                                 <div class="detalhe-venda">
-                                                    ${escapeHtml(v.nome_cliente)}<br>
-                                                    ${escapeHtml(v.telefone)}
+                                                    ${v.nome_cliente}<br>
+                                                    ${v.telefone}
                                                 </div>
                                                 ${v.status === 'reservado' ? 
                                                     `<button class="btn-confirmar" onclick="confirmarPagamento(${rifa.id}, ${v.numero})">✅ Confirmar PAGO</button>` : 
-                                                    '<span style="font-size:10px;">✅ PAGO</span>'}
+                                                    '✅ PAGO'}
                                             </div>
                                         `).join('')}
                                 </div>
                                 
                                 <div class="link-compartilhar">
-                                    🔗 Link para o cliente:<br>
+                                    🔗 Link do cliente:<br>
                                     <input type="text" value="${window.location.origin}/?rifa=${rifa.id}" readonly onclick="this.select()" style="width:100%; font-size:11px;">
-                                    <button onclick="copiarLink('${window.location.origin}/?rifa=${rifa.id}')" style="margin-top:8px; padding:6px 12px; font-size:12px;">📋 Copiar Link</button>
+                                    <button onclick="copiarLink('${window.location.origin}/?rifa=${rifa.id}')">📋 Copiar Link</button>
                                 </div>
                             </div>
                         </div>
                     `;
-                } catch (err) {
-                    console.error('Erro ao processar rifa:', err);
-                    html += `<div class="rifa-card"><div class="rifa-info">Erro ao carregar rifa ${escapeHtml(rifa.nome)}</div></div>`;
+                } catch(e) {
+                    console.error('Erro na rifa:', e);
                 }
             }
             container.innerHTML = html;
         } catch (error) {
-            console.error('Erro ao carregar rifas:', error);
-            document.getElementById('rifasList').innerHTML = '<p style="color:red; text-align:center;">Erro ao carregar rifas. Verifique se o servidor está rodando.</p>';
+            console.error('Erro:', error);
+            document.getElementById('rifasList').innerHTML = '<p style="color:red;">Erro ao carregar rifas</p>';
         }
-    }
-
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 
     async function confirmarPagamento(rifaId, numero) {
@@ -282,20 +258,18 @@
         try {
             const response = await fetch('/api/confirmar-pagamento', {
                 method: 'POST',
-                headers: { 'Content-Type':application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ rifa_id: rifaId, numero: numero })
             });
             
             if (response.ok) {
-                alert('✅ Pagamento confirmado! Número marcado como PAGO.');
+                alert('✅ Pagamento confirmado!');
                 carregarRifas();
             } else {
-                const erro = await response.json();
-                alert('❌ Erro: ' + erro.error);
+                alert('❌ Erro ao confirmar');
             }
         } catch (error) {
-            console.error('Erro ao confirmar pagamento:', error);
-            alert('❌ Erro ao confirmar pagamento');
+            alert('❌ Erro de conexão');
         }
     }
 
@@ -309,14 +283,8 @@
             chave_pix: document.getElementById('chavePix').value.trim()
         };
         
-        if (!dados.nome) {
-            alert('❌ Preencha o nome da rifa');
-            return;
-        }
-        if (!dados.chave_pix) {
-            alert('❌ Preencha a chave PIX');
-            return;
-        }
+        if (!dados.nome) { alert('❌ Preencha o nome'); return; }
+        if (!dados.chave_pix) { alert('❌ Preencha a chave PIX'); return; }
         
         const btn = event.target;
         const originalText = btn.innerText;
@@ -326,21 +294,19 @@
         try {
             const response = await fetch('/api/rifas', {
                 method: 'POST',
-                headers: { 'Content-Type':'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dados)
             });
             
             if (response.ok) {
-                alert('✅ Rifa criada com sucesso!');
+                alert('✅ Rifa criada!');
                 limparForm();
                 carregarRifas();
             } else {
-                const erro = await response.json();
-                alert('❌ Erro: ' + (erro.error || 'Erro desconhecido'));
+                alert('❌ Erro ao criar');
             }
         } catch (error) {
-            console.error('Erro:', error);
-            alert('❌ Erro de conexão com o servidor');
+            alert('❌ Erro de conexão');
         } finally {
             btn.disabled = false;
             btn.innerText = originalText;
@@ -360,8 +326,6 @@
         navigator.clipboard.writeText(link);
         alert('✅ Link copiado!');
     }
-
-    document.getElementById('loginScreen').style.display = 'block';
 </script>
 </body>
 </html>
