@@ -91,6 +91,11 @@
         }
         .btn-success { background: #48bb78; }
         .btn-pix { background: #32BCAD; }
+        .btn-whatsapp { 
+            background: #25D366; 
+            margin-top: 5px;
+        }
+        .btn-whatsapp:hover { background: #128C7E; }
         .close-modal {
             float: right;
             font-size: 28px;
@@ -117,20 +122,71 @@
             margin: 10px 0;
             cursor: pointer;
         }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.2rem;
+        }
+        .voltar-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .voltar-btn:hover { background: rgba(255,255,255,0.3); }
+        .whatsapp-fixo {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: #25D366;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+        .whatsapp-fixo:hover {
+            transform: scale(1.1);
+        }
+        .whatsapp-fixo img {
+            width: 35px;
+            height: 35px;
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1>🎟️ Escolha sua Rifa</h1>
-        <p>Clique na rifa desejada e garanta seus números</p>
+        <h1>🎟️ RifaPro</h1>
+        <p id="descricaoHeader">Garanta seus números</p>
+    </div>
+
+    <div id="voltarDiv" style="display: none;">
+        <button class="voltar-btn" onclick="voltarParaLista()">← Voltar para todas as rifas</button>
     </div>
 
     <div class="card">
         <div id="rifasList" class="grid">
-            <p style="text-align: center; grid-column: 1/-1;">Carregando rifas...</p>
+            <div class="loading">Carregando rifas...</div>
         </div>
     </div>
+</div>
+
+<!-- Botão WhatsApp Flutuante -->
+<div class="whatsapp-fixo" onclick="abrirWhatsApp()">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" width="30" height="30" fill="white">
+        <path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.2-17.1-41.4-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.1 13.9 10.9-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"/>
+    </svg>
 </div>
 
 <!-- Modal de Compra -->
@@ -154,21 +210,20 @@
         </div>
         <div class="form-group">
             <label>📱 Telefone (WhatsApp)</label>
-            <input type="tel" id="clienteTelefone" placeholder="(11) 99999-9999">
+            <input type="tel" id="clienteTelefone" placeholder="(88) 98859-4944">
         </div>
         
-        <!-- Área do PIX Estático -->
         <div id="pixArea" style="display: none;">
             <div class="pix-area">
                 <p><strong>💸 Pague via PIX</strong></p>
                 <p>Valor: <strong id="valorPix">R$ 0,00</strong></p>
-                <!-- ⚠️ SUBSTITUA A LINHA ABAIXO PELA URL DA SUA IMAGEM QR CODE -->
-                <img id="qrCodeImage" src="https://via.placeholder.com/200?text=COLOQUE+SEU+QR+CODE" alt="QR Code PIX">
+                <img id="qrCodeImage" src="https://via.placeholder.com/200?text=QR+CODE" alt="QR Code PIX">
                 <div class="pix-codigo" id="pixCopiaCola" onclick="copiarPix()">
                     Clique aqui para copiar o código PIX
                 </div>
                 <button onclick="copiarPix()" class="btn-pix">📋 Copiar Código PIX</button>
-                <p style="font-size: 12px; margin-top: 10px; color: #666;">✅ Após o pagamento, entre em contato no WhatsApp com o comprovante para confirmarmos seus números.</p>
+                <button id="btnWhatsappCompra" class="btn-whatsapp" style="display: none;" onclick="enviarWhatsAppConfirmacao()">📱 Enviar comprovante no WhatsApp</button>
+                <p style="font-size: 12px; margin-top: 10px; color: #666;">✅ Após o pagamento, envie o comprovante no WhatsApp para confirmarmos seus números.</p>
             </div>
         </div>
         
@@ -178,86 +233,129 @@
 </div>
 
 <script>
+    // Configurações
+    const WHATSAPP_NUMBER = "5588988594944"; // Número do administrador
+    const QR_CODE_URL = "https://via.placeholder.com/200?text=COLOQUE+SUA+IMAGEM+QR+AQUI";
+    const PIX_CODIGO = "COLOQUE AQUI SEU CÓDIGO PIX COPIA E COLA";
+
     let rifaAtual = null;
     let numerosGerados = [];
     let valorTotal = 0;
+    let rifaEspecificaId = null;
+    let clienteAtual = { nome: '', telefone: '' };
 
-    // ⚠️ COLOQUE AQUI O SEU QR CODE ESTÁTICO
-    const QR_CODE_URL = "https://imgur.com/a/5M40DIH";
-    
-    // ⚠️ COLOQUE AQUI O SEU CÓDIGO PIX COPIA E COLA
-    const PIX_CODIGO = "00020101021126580014br.gov.bcb.pix0136415073bf-86c3-40ff-8a8a-da8aa76a94a15204000053039865802BR5917CICERO W L VIEIRA6011BREJO SANTO62070503***6304988B";
+    function abrirWhatsApp() {
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}`, '_blank');
+    }
 
-    function carregarRifas() {
-        fetch('/api/rifas')
-            .then(res => res.json())
-            .then(rifas => {
-                const container = document.getElementById('rifasList');
-                if (rifas.length === 0) {
-                    container.innerHTML = '<p style="text-align: center; grid-column: 1/-1;">Nenhuma rifa disponível no momento.</p>';
-                    return;
+    function enviarWhatsAppConfirmacao() {
+        const mensagem = `Olá! Acabei de fazer um pedido na rifa "${rifaAtual.nome}".\n\n📋 Números: ${numerosGerados.join(', ')}\n💰 Valor: R$ ${valorTotal.toFixed(2)}\n👤 Nome: ${clienteAtual.nome}\n📱 Telefone: ${clienteAtual.telefone}\n\n✅ Já efetuei o pagamento via PIX. Segue comprovante em anexo.`;
+        const msgEncoded = encodeURIComponent(mensagem);
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msgEncoded}`, '_blank');
+    }
+
+    function getRifaIdFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('rifa');
+    }
+
+    async function carregarRifas() {
+        const rifaId = getRifaIdFromURL();
+        rifaEspecificaId = rifaId;
+        
+        try {
+            const response = await fetch('/api/rifas');
+            let rifas = await response.json();
+            
+            if (rifaId) {
+                rifas = rifas.filter(r => r.id == rifaId);
+                if (rifas.length > 0) {
+                    document.getElementById('descricaoHeader').innerHTML = `🎟️ ${rifas[0].nome}`;
+                    document.getElementById('voltarDiv').style.display = 'block';
+                } else {
+                    document.getElementById('descricaoHeader').innerHTML = 'Rifa não encontrada';
                 }
-                container.innerHTML = rifas.map(rifa => `
-                    <div class="rifa-card" onclick="abrirCompra(${rifa.id})">
-                        <img src="${rifa.foto || 'https://imgur.com/a/5M40DIH'}" alt="${rifa.nome}">
-                        <div class="rifa-info">
-                            <h3>${rifa.nome}</h3>
-                            <p>${rifa.descricao || ''}</p>
-                            <p class="preco">R$ ${rifa.valor_bilhete.toFixed(2)}</p>
-                            <p>🎫 Disponíveis: ${rifa.quantidade_numeros - (rifa.numeros_vendidos || 0)}</p>
-                        </div>
+            } else {
+                document.getElementById('descricaoHeader').innerHTML = 'Escolha sua rifa e garanta seus números';
+                document.getElementById('voltarDiv').style.display = 'none';
+            }
+            
+            const container = document.getElementById('rifasList');
+            
+            if (rifas.length === 0) {
+                container.innerHTML = '<p style="text-align: center; grid-column: 1/-1;">Nenhuma rifa disponível no momento.</p>';
+                return;
+            }
+            
+            container.innerHTML = rifas.map(rifa => `
+                <div class="rifa-card" onclick="abrirCompra(${rifa.id})">
+                    <img src="${rifa.foto || 'https://via.placeholder.com/300x200?text=Rifa'}" alt="${rifa.nome}" onerror="this.src='https://via.placeholder.com/300x200?text=Sem+Foto'">
+                    <div class="rifa-info">
+                        <h3>${rifa.nome}</h3>
+                        <p>${rifa.descricao || ''}</p>
+                        <p class="preco">R$ ${rifa.valor_bilhete.toFixed(2)}</p>
+                        <p>🎫 Disponíveis: ${rifa.quantidade_numeros - (rifa.numeros_vendidos || 0)}</p>
                     </div>
-                `).join('');
-            });
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Erro ao carregar rifas:', error);
+            document.getElementById('rifasList').innerHTML = '<p style="text-align: center; color: red;">Erro ao carregar rifas. Tente novamente.</p>';
+        }
     }
 
-    function abrirCompra(id) {
-        fetch(`/api/rifas/${id}`)
-            .then(res => res.json())
-            .then(rifa => {
-                rifaAtual = rifa;
-                document.getElementById('modalTitulo').innerHTML = rifa.nome;
-                document.getElementById('modalDescricao').innerHTML = rifa.descricao || '';
-                document.getElementById('modalCompra').style.display = 'flex';
-                document.getElementById('numerosContainer').innerHTML = '';
-                document.getElementById('pixArea').style.display = 'none';
-                document.getElementById('btnMostrarPix').style.display = 'none';
-                document.getElementById('msgCompra').innerHTML = '';
-                document.getElementById('clienteNome').value = '';
-                document.getElementById('clienteTelefone').value = '';
-                document.getElementById('qtdCompra').value = '1';
-                numerosGerados = [];
-                valorTotal = 0;
-            });
+    function voltarParaLista() {
+        window.location.href = window.location.origin;
     }
 
-    function gerarNumerosAleatorios() {
+    async function abrirCompra(id) {
+        const response = await fetch(`/api/rifas/${id}`);
+        rifaAtual = await response.json();
+        
+        document.getElementById('modalTitulo').innerHTML = rifaAtual.nome;
+        document.getElementById('modalDescricao').innerHTML = rifaAtual.descricao || '';
+        document.getElementById('modalCompra').style.display = 'flex';
+        document.getElementById('pixArea').style.display = 'none';
+        document.getElementById('numerosContainer').innerHTML = '';
+        document.getElementById('msgCompra').innerHTML = '';
+        document.getElementById('btnMostrarPix').style.display = 'none';
+        document.getElementById('clienteNome').value = '';
+        document.getElementById('clienteTelefone').value = '';
+        document.getElementById('qtdCompra').value = '1';
+        numerosGerados = [];
+        valorTotal = 0;
+    }
+
+    function fecharModal() {
+        document.getElementById('modalCompra').style.display = 'none';
+    }
+
+    async function gerarNumerosAleatorios() {
         const qtd = parseInt(document.getElementById('qtdCompra').value);
         if (qtd < 1) {
             alert('Quantidade inválida');
             return;
         }
         
-        fetch('/api/gerar-numeros', {
+        const response = await fetch('/api/gerar-numeros', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ rifa_id: rifaAtual.id, quantidade: qtd })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) {
-                alert('❌ ' + data.error);
-            } else {
-                numerosGerados = data.numeros;
-                valorTotal = numerosGerados.length * rifaAtual.valor_bilhete;
-                const container = document.getElementById('numerosContainer');
-                container.innerHTML = numerosGerados.map(n => `<div class="numero-item">${n}</div>`).join('');
-                document.getElementById('btnMostrarPix').style.display = 'block';
-            }
         });
+        
+        const data = await response.json();
+        if (data.error) {
+            alert('❌ ' + data.error);
+        } else {
+            numerosGerados = data.numeros;
+            valorTotal = numerosGerados.length * rifaAtual.valor_bilhete;
+            const container = document.getElementById('numerosContainer');
+            container.innerHTML = numerosGerados.map(n => `<div class="numero-item">${n}</div>`).join('');
+            document.getElementById('btnMostrarPix').style.display = 'block';
+        }
     }
 
-    function mostrarPix() {
+    async function mostrarPix() {
         const nome = document.getElementById('clienteNome').value.trim();
         const telefone = document.getElementById('clienteTelefone').value.trim();
         
@@ -270,42 +368,39 @@
             return;
         }
         
+        clienteAtual = { nome, telefone };
+        
         document.getElementById('valorPix').innerHTML = `R$ ${valorTotal.toFixed(2)}`;
         document.getElementById('qrCodeImage').src = QR_CODE_URL;
         document.getElementById('pixCopiaCola').innerHTML = PIX_CODIGO;
         document.getElementById('pixArea').style.display = 'block';
         document.getElementById('btnMostrarPix').style.display = 'none';
+        document.getElementById('btnWhatsappCompra').style.display = 'block';
         
         document.getElementById('msgCompra').innerHTML = `
             <div style="background:#e6ffe6; padding:15px; border-radius:10px; margin-top:10px;">
                 ✅ <strong>Números reservados! Aguardando pagamento.</strong><br>
                 🎫 Números: ${numerosGerados.join(', ')}<br>
                 💰 Valor: R$ ${valorTotal.toFixed(2)}<br>
-                📱 Após pagar, envie o comprovante para confirmar seus números.
+                📱 Após pagar, clique no botão WhatsApp para enviar o comprovante.
             </div>
         `;
         
-        // Salvar reserva no servidor (opcional)
-        fetch('/api/reservar-numeros', {
+        await fetch('/api/reservar-numeros', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 rifa_id: rifaAtual.id,
                 numeros: numerosGerados,
                 nome_cliente: nome,
-                telefone: telefone,
-                valor_total: valorTotal
+                telefone: telefone
             })
-        }).catch(err => console.error('Erro ao reservar:', err));
+        });
     }
 
     function copiarPix() {
         navigator.clipboard.writeText(PIX_CODIGO);
         alert('✅ Código PIX copiado!');
-    }
-
-    function fecharModal() {
-        document.getElementById('modalCompra').style.display = 'none';
     }
 
     window.onclick = function(event) {
